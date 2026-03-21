@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard — Number Sense</title>
+  <link rel="stylesheet" href="css/style.css"/>
+  <style>
+    .dash-wrap {
+      width:100%; max-width:900px;
+      padding:0 24px 80px;
+      display:flex; flex-direction:column; gap:40px;
+    }
+
+    /* ── Section title ─────────────────────────────────── */
+    .dash-section-title {
+      font-family:'Syne',sans-serif; font-size:.85rem;
+      text-transform:uppercase; letter-spacing:.12em;
+      color:var(--accent); border-bottom:1px solid var(--border);
+      padding-bottom:10px; margin-bottom:16px;
+    }
+
+    /* ── Overview summary cards ────────────────────────── */
+    .summary-grid {
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
+      gap:14px;
+    }
+    .sum-card {
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:14px; padding:18px 14px; text-align:center;
+    }
+    .sum-val {
+      font-family:'Syne',sans-serif; font-size:1.8rem; font-weight:800;
+    }
+    .sum-lbl { font-size:.73rem; color:var(--muted); margin-top:4px; }
+
+    /* ── Per-skill table ───────────────────────────────── */
+    .skill-table { width:100%; border-collapse:collapse; font-size:.84rem; }
+    .skill-table th {
+      text-align:left; padding:9px 14px; color:var(--muted);
+      font-family:'Syne',sans-serif; font-size:.72rem;
+      text-transform:uppercase; letter-spacing:.08em;
+      border-bottom:1px solid var(--border);
+    }
+    .skill-table td { padding:11px 14px; border-bottom:1px solid rgba(255,255,255,.04); vertical-align:middle; }
+    .skill-table tr:hover td { background:rgba(255,255,255,.025); }
+
+    /* accuracy bar inside table */
+    .acc-wrap { display:flex; align-items:center; gap:10px; }
+    .acc-bar-bg { flex:1; height:7px; background:var(--border); border-radius:99px; overflow:hidden; min-width:60px; }
+    .acc-bar    { height:100%; border-radius:99px; transition:width .6s; }
+    .acc-pct    { font-family:'Syne',sans-serif; font-size:.8rem; min-width:34px; text-align:right; }
+
+    /* difficulty badge */
+    .diff-badge {
+      display:inline-block; border-radius:6px; padding:2px 8px;
+      font-family:'Syne',sans-serif; font-size:.68rem; font-weight:700;
+    }
+    .diff-easy   { background:rgba(67,224,151,.15); color:var(--correct); }
+    .diff-medium { background:rgba(240,192,64,.15);  color:var(--accent); }
+    .diff-hard   { background:rgba(242,92,105,.15);  color:var(--wrong); }
+
+    /* best time pill */
+    .time-pill {
+      font-family:'Syne',sans-serif; font-size:.8rem;
+      color:var(--accent2);
+    }
+
+    /* ── Category accuracy bars ────────────────────────── */
+    .cat-row { display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+    .cat-name { width:200px; font-size:.82rem; color:var(--muted); flex-shrink:0; }
+    .cat-bar-wrap { flex:1; height:8px; background:var(--border); border-radius:99px; overflow:hidden; }
+    .cat-bar { height:100%; border-radius:99px; }
+    .cat-pct { width:38px; text-align:right; font-family:'Syne',sans-serif; font-size:.8rem; }
+
+    /* ── Empty + controls ──────────────────────────────── */
+    .empty-msg { color:var(--muted); font-size:.95rem; text-align:center; padding:48px; }
+    .empty-msg a { color:var(--accent); text-decoration:none; }
+    .clear-btn {
+      background:none; border:1px solid var(--border); border-radius:8px;
+      color:var(--muted); padding:7px 16px; font-size:.78rem; cursor:pointer;
+      transition:all .15s; align-self:flex-end;
+    }
+    .clear-btn:hover { border-color:var(--wrong); color:var(--wrong); }
+
+    /* ── Sparkline trend ───────────────────────────────── */
+    .trend-wrap {
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:14px; padding:20px; overflow-x:auto;
+    }
+  </style>
+</head>
+<body class="practice-body">
+  <a href="index.html" class="back-link">← Back to Home</a>
+
+  <div class="hero-header" style="padding-top:32px; padding-bottom:20px;">
+    <div class="hero-title"><span class="title-accent">Progress</span> Dashboard</div>
+    <p class="hero-sub">Your skill-by-skill accuracy, best times, and improvement over time.</p>
+  </div>
+
+  <div class="dash-wrap" id="dash-wrap"></div>
+
+  <script>
+  (function(){
+
+    // ── Read skill data saved by practice.js ─────────────
+    // Storage key format:  ns_skill_{skillKey}_{difficulty}
+    // Each entry: { correct, wrong, times[], sessions[] }
+    // sessions[]: { date, correct, wrong, avgTime }
+
+    // Also pull the flat skill-label map from skills.js if loaded,
+    // otherwise use a built-in lookup.
+    const LABELS = {
+      multiply2x2:'2-Digit × 2-Digit (FOIL)',
+      multiplyBy11:'Multiply by 11',
+      multiplyBy101:'Multiply by 101',
+      multiplyBy25:'Multiply by 25',
+      multiplyBy75:'Multiply by 75',
+      doubleHalf:'Double & Half Trick',
+      near100:'Multiply Near 100',
+      squaresEndIn5:'Square Numbers Ending in 5',
+      squares41to59:'Squares 41–59',
+      squaring:'Squaring 2-Digit Numbers',
+      equidistant:'Equidistant Multiplication',
+      multiplyReverses:'Multiplying Reverse-Digit Numbers',
+      differenceOfSquares:'Difference of Squares',
+      bothEndIn5:'Two Numbers Ending in 5',
+      factoringNumerical:'Factoring Numerical Expressions',
+      mixedNumbers:'Mixed Number Multiplication',
+      remainderBy4:'Remainder ÷ 4',
+      remainderBy9:'Remainder ÷ 9',
+      remainderBy11:'Remainder ÷ 11',
+      divideBy9:'Dividing by 9',
+      percentage:'Percentage of a Number',
+      discriminant:'Discriminant & Roots',
+      vertexParabola:'Vertex of a Parabola',
+      additionMulti:'Multi-Number Addition',
+      orderOfOps:'Order of Operations',
+      subtractReverses:'Subtracting Reverse Digits',
+      fractionPlusFractionInverse:'a/b + b/a Trick',
+      fractionSubtraction:'Mixed Number Subtraction',
+      fibonacci:'Fibonacci Numbers',
+      geometricSeries:'Infinite Geometric Series',
+      sumOfSquares:'Sum of Squares',
+      consecIntegers:'Consecutive Integers',
+    };
+
+    const CATEGORIES = {
+      multiply2x2:'Multiplication', multiplyBy11:'Multiplication',
+      multiplyBy101:'Multiplication', multiplyBy25:'Multiplication',
+      multiplyBy75:'Multiplication', doubleHalf:'Multiplication',
+      near100:'Multiplication', squaresEndIn5:'Multiplication',
+      squares41to59:'Multiplication', squaring:'Multiplication',
+      equidistant:'Multiplication', multiplyReverses:'Multiplication',
+      differenceOfSquares:'Multiplication', bothEndIn5:'Multiplication',
+      factoringNumerical:'Multiplication', mixedNumbers:'Multiplication',
+      remainderBy4:'Division', remainderBy9:'Division',
+      remainderBy11:'Division', divideBy9:'Division',
+      percentage:'Division', discriminant:'Division',
+      vertexParabola:'Division',
+      additionMulti:'Addition & Subtraction', orderOfOps:'Addition & Subtraction',
+      subtractReverses:'Addition & Subtraction', fractionPlusFractionInverse:'Addition & Subtraction',
+      fractionSubtraction:'Addition & Subtraction', fibonacci:'Addition & Subtraction',
+      geometricSeries:'Addition & Subtraction', sumOfSquares:'Addition & Subtraction',
+      consecIntegers:'Addition & Subtraction',
+    };
+
+    // ── Collect all stored skill data ─────────────────────
+    const diffs = ['easy','medium','hard'];
+    const allRows = []; // { skillKey, diff, label, correct, wrong, bestTime, avgTime, sessions }
+
+    Object.keys(localStorage).forEach(key => {
+      if (!key.startsWith('ns_skill_')) return;
+      const parts  = key.replace('ns_skill_','').split('_');
+      const diff   = parts.pop();
+      const skillKey = parts.join('_');
+      if (!diffs.includes(diff)) return;
+      try {
+        const d = JSON.parse(localStorage.getItem(key));
+        if (!d || (d.correct === 0 && d.wrong === 0)) return;
+        const total   = d.correct + d.wrong;
+        const acc     = total ? Math.round(d.correct / total * 100) : 0;
+        const times   = d.times || [];
+        const bestTime = times.length ? Math.min(...times) : null;
+        const avgTime  = times.length ? times.reduce((a,b)=>a+b,0)/times.length : null;
+        allRows.push({
+          skillKey, diff,
+          label: LABELS[skillKey] || skillKey,
+          category: CATEGORIES[skillKey] || 'Other',
+          correct: d.correct, wrong: d.wrong, total,
+          acc, bestTime, avgTime,
+          sessions: d.sessions || [],
+        });
+      } catch(e) {}
+    });
+
+    const wrap = document.getElementById('dash-wrap');
+
+    if (allRows.length === 0) {
+      wrap.innerHTML = `<div class="empty-msg">
+        No practice data yet.<br><br>
+        <a href="index.html">Start practicing a skill</a> and your stats will appear here automatically.
+      </div>`;
+      return;
+    }
+
+    // ── Overview summary ──────────────────────────────────
+    const totalCorrect  = allRows.reduce((a,r)=>a+r.correct,0);
+    const totalWrong    = allRows.reduce((a,r)=>a+r.wrong,0);
+    const totalQ        = totalCorrect + totalWrong;
+    const overallAcc    = totalQ ? Math.round(totalCorrect/totalQ*100) : 0;
+    const skillsPracticed = new Set(allRows.map(r=>r.skillKey)).size;
+    const allTimes      = allRows.flatMap(r=>r.avgTime?[r.avgTime]:[]);
+    const overallAvgTime = allTimes.length ? (allTimes.reduce((a,b)=>a+b,0)/allTimes.length).toFixed(1) : '—';
+    const bestAcc       = allRows.reduce((best,r)=>r.acc>best?r.acc:best,0);
+
+    const sumSec = document.createElement('div');
+    sumSec.innerHTML = `
+      <div class="dash-section-title">📊 Overview</div>
+      <div class="summary-grid">
+        <div class="sum-card">
+          <div class="sum-val" style="color:var(--accent2)">${skillsPracticed}</div>
+          <div class="sum-lbl">Skills Practiced</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-val" style="color:var(--correct)">${totalCorrect}</div>
+          <div class="sum-lbl">Total Correct</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-val" style="color:var(--wrong)">${totalWrong}</div>
+          <div class="sum-lbl">Total Wrong</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-val" style="color:var(--accent)">${overallAcc}%</div>
+          <div class="sum-lbl">Overall Accuracy</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-val" style="color:var(--accent2);font-size:1.4rem">${overallAvgTime}s</div>
+          <div class="sum-lbl">Avg Answer Time</div>
+        </div>
+      </div>`;
+    wrap.appendChild(sumSec);
+
+    // ── Category accuracy bars ────────────────────────────
+    const catData = {};
+    allRows.forEach(r => {
+      const c = r.category;
+      if (!catData[c]) catData[c] = { correct:0, wrong:0 };
+      catData[c].correct += r.correct;
+      catData[c].wrong   += r.wrong;
+    });
+
+    const catSec = document.createElement('div');
+    catSec.innerHTML = `<div class="dash-section-title">🎯 Accuracy by Category</div>`;
+    Object.entries(catData)
+      .sort((a,b) => {
+        const accA = a[1].correct/(a[1].correct+a[1].wrong);
+        const accB = b[1].correct/(b[1].correct+b[1].wrong);
+        return accA - accB;
+      })
+      .forEach(([cat,d]) => {
+        const pct   = Math.round(d.correct/(d.correct+d.wrong)*100);
+        const color = pct>=80?'var(--correct)':pct>=50?'var(--accent)':'var(--wrong)';
+        const row   = document.createElement('div');
+        row.className = 'cat-row';
+        row.innerHTML = `
+          <span class="cat-name">${cat}</span>
+          <div class="cat-bar-wrap">
+            <div class="cat-bar" style="width:${pct}%;background:${color}"></div>
+          </div>
+          <span class="cat-pct" style="color:${color}">${pct}%</span>`;
+        catSec.appendChild(row);
+      });
+    wrap.appendChild(catSec);
+
+    // ── Per-skill table ───────────────────────────────────
+    // Group by category, sort by accuracy asc within each
+    const byCategory = {};
+    allRows.forEach(r => {
+      if (!byCategory[r.category]) byCategory[r.category] = [];
+      byCategory[r.category].push(r);
+    });
+
+    const skillSec = document.createElement('div');
+    skillSec.innerHTML = `<div class="dash-section-title">🔍 Skill Breakdown</div>`;
+
+    const catOrder = ['Multiplication','Division','Addition & Subtraction','Other'];
+    catOrder.forEach(cat => {
+      if (!byCategory[cat]) return;
+      const rows = byCategory[cat].sort((a,b) => a.acc - b.acc);
+
+      const catHeader = document.createElement('p');
+      catHeader.style.cssText = 'font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:16px 0 8px;font-family:Syne,sans-serif;';
+      catHeader.textContent = cat;
+      skillSec.appendChild(catHeader);
+
+      const tableWrap = document.createElement('div');
+      tableWrap.style.overflowX = 'auto';
+      tableWrap.innerHTML = `
+        <table class="skill-table">
+          <thead><tr>
+            <th>Skill</th>
+            <th>Difficulty</th>
+            <th>Correct</th>
+            <th>Wrong</th>
+            <th>Accuracy</th>
+            <th>Best Time</th>
+            <th>Avg Time</th>
+          </tr></thead>
+          <tbody>
+            ${rows.map(r => {
+              const color = r.acc>=80?'var(--correct)':r.acc>=50?'var(--accent)':'var(--wrong)';
+              const best  = r.bestTime ? r.bestTime.toFixed(1)+'s' : '—';
+              const avg   = r.avgTime  ? r.avgTime.toFixed(1)+'s'  : '—';
+              return `<tr>
+                <td style="font-weight:500">${r.label}</td>
+                <td><span class="diff-badge diff-${r.diff}">${r.diff}</span></td>
+                <td style="color:var(--correct);font-family:'Syne',sans-serif;font-weight:700">${r.correct}</td>
+                <td style="color:var(--wrong)">${r.wrong}</td>
+                <td>
+                  <div class="acc-wrap">
+                    <div class="acc-bar-bg">
+                      <div class="acc-bar" style="width:${r.acc}%;background:${color}"></div>
+                    </div>
+                    <span class="acc-pct" style="color:${color}">${r.acc}%</span>
+                  </div>
+                </td>
+                <td class="time-pill">${best}</td>
+                <td style="color:var(--muted)">${avg}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>`;
+      skillSec.appendChild(tableWrap);
+    });
+    wrap.appendChild(skillSec);
+
+    // ── Weakest skills highlight ──────────────────────────
+    const weakest = [...allRows]
+      .filter(r => r.total >= 5)
+      .sort((a,b) => a.acc - b.acc)
+      .slice(0, 4);
+
+    if (weakest.length) {
+      const weakSec = document.createElement('div');
+      weakSec.innerHTML = `<div class="dash-section-title">⚠️ Focus Areas (lowest accuracy, ≥5 attempts)</div>
+        <div class="summary-grid">
+          ${weakest.map(r => `
+            <a href="practice.html?skill=${r.skillKey}" style="text-decoration:none;">
+              <div class="sum-card" style="border-color:var(--wrong);cursor:pointer;transition:transform .15s;"
+                   onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform=''">
+                <div class="sum-val" style="color:var(--wrong);font-size:1.4rem">${r.acc}%</div>
+                <div class="sum-lbl">${r.label}</div>
+                <div style="margin-top:6px;"><span class="diff-badge diff-${r.diff}">${r.diff}</span></div>
+              </div>
+            </a>`).join('')}
+        </div>`;
+      wrap.appendChild(weakSec);
+    }
+
+    // ── Best skills highlight ─────────────────────────────
+    const best = [...allRows]
+      .filter(r => r.total >= 5 && r.acc === 100)
+      .slice(0, 4);
+
+    if (best.length) {
+      const bestSec = document.createElement('div');
+      bestSec.innerHTML = `<div class="dash-section-title">⭐ Mastered Skills (100% accuracy, ≥5 attempts)</div>
+        <div class="summary-grid">
+          ${best.map(r => `
+            <div class="sum-card" style="border-color:var(--correct)">
+              <div class="sum-val" style="color:var(--correct);font-size:1.4rem">100%</div>
+              <div class="sum-lbl">${r.label}</div>
+              <div style="margin-top:6px;"><span class="diff-badge diff-${r.diff}">${r.diff}</span></div>
+            </div>`).join('')}
+        </div>`;
+      wrap.appendChild(bestSec);
+    }
+
+    // ── Clear button ──────────────────────────────────────
+    const clearWrap = document.createElement('div');
+    clearWrap.style.display = 'flex';
+    clearWrap.innerHTML = `<button class="clear-btn"
+      onclick="if(confirm('Clear all practice data? This cannot be undone.')){
+        Object.keys(localStorage).filter(k=>k.startsWith('ns_skill_')).forEach(k=>localStorage.removeItem(k));
+        location.reload();
+      }">🗑 Clear All Practice Data</button>`;
+    wrap.appendChild(clearWrap);
+
+  })();
+  </script>
+</body>
+</html>

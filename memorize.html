@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Memorization — Number Sense</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="practice-body">
+
+  <a href="index.html" class="back-link">← Back to Home</a>
+
+  <!-- Stats bar -->
+  <div class="stats-bar">
+    <div class="stat-pill">
+      <span class="stat-label">Correct</span>
+      <span class="stat-value" id="stat-correct">0</span>
+    </div>
+    <div class="stat-pill stat-wrong">
+      <span class="stat-label">Wrong</span>
+      <span class="stat-value" id="stat-wrong">0</span>
+    </div>
+    <div class="stat-pill stat-avg">
+      <span class="stat-label">Avg Time</span>
+      <span class="stat-value" id="stat-avg">—</span>
+    </div>
+  </div>
+
+  <!-- Arena -->
+  <div class="arena">
+
+    <div class="skill-label" id="skill-label">Memorization Practice</div>
+
+    <!-- Timer -->
+    <div class="timer-row">
+      <div class="timer-bar-wrap">
+        <div class="timer-bar" id="timer-bar"></div>
+      </div>
+      <span class="timer-text" id="timer-text">0.0s</span>
+    </div>
+
+    <!-- Problem box -->
+    <div class="problem-box" id="problem-box">
+      <span class="problem-text" id="problem-text">Loading…</span>
+    </div>
+
+    <!-- Answer input -->
+    <div class="answer-row" id="answer-row">
+      <input
+        type="text"
+        id="answer-input"
+        class="answer-input"
+        placeholder="Your answer"
+        autocomplete="off"
+        autofocus
+      />
+      <button class="submit-btn" id="submit-btn">Check</button>
+    </div>
+
+    <!-- X lives display -->
+    <div class="lives-row" id="lives-row">
+      <span class="life" id="life-0">✕</span>
+      <span class="life" id="life-1">✕</span>
+      <span class="life" id="life-2">✕</span>
+    </div>
+
+    <!-- Explanation panel -->
+    <div class="explanation-panel" id="explanation-panel" style="display:none;">
+      <h3 class="explanation-title" id="explanation-title">The answer is …</h3>
+      <p class="explanation-body" id="explanation-body"
+         style="white-space:pre-line; font-family:'Courier New',monospace; font-size:.88rem; line-height:1.9;"></p>
+      <button class="next-btn" id="next-btn">I'm ready for the next question →</button>
+    </div>
+
+  </div>
+
+  <script src="js/memSkills.js"></script>
+  <script src="js/memPractice.js"></script>
+</body>
+</html>
